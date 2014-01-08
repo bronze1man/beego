@@ -66,29 +66,6 @@ type JsonField struct {
 	Data string
 }
 
-func (e *JsonField) String() string {
-	data, _ := json.Marshal(e)
-	return string(data)
-}
-
-func (e *JsonField) FieldType() int {
-	return TypeTextField
-}
-
-func (e *JsonField) SetRaw(value interface{}) error {
-	switch d := value.(type) {
-	case string:
-		return json.Unmarshal([]byte(d), e)
-	default:
-		return fmt.Errorf("<JsonField.SetRaw> unknown value `%v`", value)
-	}
-	return nil
-}
-
-func (e *JsonField) RawValue() interface{} {
-	return e.String()
-}
-
 var _ Fielder = new(JsonField)
 
 type Data struct {
@@ -160,7 +137,7 @@ type User struct {
 	ShouldSkip string    `orm:"-"`
 	Nums       int
 	Langs      SliceStringField `orm:"size(100)"`
-	Extra      JsonField        `orm:"type(text)"`
+	Extra      JsonField        `orm:"serialize(json)"`
 }
 
 func (u *User) TableIndex() [][]string {
