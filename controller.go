@@ -165,7 +165,7 @@ func (c *Controller) RenderBytes() ([]byte, error) {
 
 		if c.LayoutSections != nil {
 			for sectionName, sectionTpl := range c.LayoutSections {
-				if (sectionTpl == "") {
+				if sectionTpl == "" {
 					c.Data[sectionName] = ""
 					continue
 				}
