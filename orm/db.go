@@ -7,6 +7,7 @@ import (
 	"reflect"
 	"strings"
 	"time"
+	"encoding/json"
 )
 
 const (
@@ -123,6 +124,12 @@ func (d *dbBase) collectFieldValue(mi *modelInfo, fi *fieldInfo, ind reflect.Val
 			}
 		}
 		switch fi.fieldType {
+		case TypeJsonSerialization:
+			vbyte,err:=json.Marshal(field.Interface())
+			if err!=nil{
+				return nil,fmt.Errorf("field %s cannot json.Marshal error:%s",fi.fullName,err)
+			}
+			value = string(vbyte)
 		case TypeDateField, TypeDateTimeField:
 			if fi.auto_now || fi.auto_now_add && insert {
 				tnow := time.Now()
@@ -884,6 +891,13 @@ setValue:
 		} else {
 			value = str.String()
 		}
+	case fieldType == TypeJsonSerialization:
+		vbyte,err := json.Marshal(val)
+		if err != nil {
+			tErr = err
+			goto end
+		}
+		value = string(vbyte)
 	case fieldType == TypeDateField || fieldType == TypeDateTimeField:
 		if str == nil {
 			switch t := val.(type) {
@@ -1016,6 +1030,16 @@ setValue:
 				value = time.Time{}
 			}
 			field.Set(reflect.ValueOf(value))
+		}
+	case fieldType == TypeJsonSerialization:
+		if isNative {
+			if value == nil {
+				field.Set(reflect.New(field.Type()).Elem())
+			}
+			err := json.Unmarshal([]byte(value.(string)), field.Addr().Interface())
+			if err!=nil{
+				return nil,fmt.Errorf("converted value `%v` set to Fielder `%s` failed, err: %s", value, fi.fullName, err)
+			}
 		}
 	case fieldType&IsIntegerField > 0:
 		if fieldType&IsPostiveIntegerField > 0 {

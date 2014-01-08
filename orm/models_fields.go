@@ -49,6 +49,8 @@ const (
 	RelManyToMany
 	RelReverseOne
 	RelReverseMany
+
+	TypeJsonSerialization
 )
 
 const (

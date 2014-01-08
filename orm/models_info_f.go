@@ -206,6 +206,17 @@ checkType:
 				goto wrongTag
 			}
 		}
+		tag = "serialize"
+		tagValue = tags[tag]
+		if tagValue !=""{
+			switch tagValue {
+			case "json":
+				fieldType = TypeJsonSerialization
+				break checkType
+			default:
+				err = fmt.Errorf("error")
+				goto wrongTag
+		}
 
 		fieldType, err = getFieldType(addrField)
 		if err != nil {
