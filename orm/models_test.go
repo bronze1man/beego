@@ -1,7 +1,6 @@
 package orm
 
 import (
-	"encoding/json"
 	"fmt"
 	"os"
 	"strings"
@@ -66,7 +65,6 @@ type JsonField struct {
 	Data string
 }
 
-var _ Fielder = new(JsonField)
 
 type Data struct {
 	Id       int

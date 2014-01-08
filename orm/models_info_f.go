@@ -208,16 +208,17 @@ checkType:
 		}
 		tag = "serialize"
 		tagValue = tags[tag]
-		if tagValue !=""{
-			switch tagValue {
-			case "json":
-				fieldType = TypeJsonSerialization
-				break checkType
-			default:
-				err = fmt.Errorf("error")
-				goto wrongTag
-            }
-		}
+        fmt.Println(sf.Name,tagValue)
+        switch tagValue {
+        case "":
+        case "json":
+            fmt.Println(1)
+            fieldType = TypeJsonSerialization
+            break checkType
+        default:
+            err = fmt.Errorf("error")
+            goto wrongTag
+        }
 
 		fieldType, err = getFieldType(addrField)
 		if err != nil {
