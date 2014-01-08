@@ -216,6 +216,7 @@ checkType:
 			default:
 				err = fmt.Errorf("error")
 				goto wrongTag
+            }
 		}
 
 		fieldType, err = getFieldType(addrField)
