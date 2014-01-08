@@ -1,11 +1,10 @@
 package beego
 
 import (
-	"crypto/rand"
+	"errors"
 	"fmt"
 	"html/template"
 	"net/url"
-	"os"
 	"reflect"
 	"regexp"
 	"strconv"
@@ -13,14 +12,7 @@ import (
 	"time"
 )
 
-func webTime(t time.Time) string {
-	ftime := t.Format(time.RFC1123)
-	if strings.HasSuffix(ftime, "UTC") {
-		ftime = ftime[0:len(ftime)-3] + "GMT"
-	}
-	return ftime
-}
-
+// Substr returns the substr from start to length.
 func Substr(s string, start, length int) string {
 	bt := []rune(s)
 	if start < 0 {
@@ -35,7 +27,7 @@ func Substr(s string, start, length int) string {
 	return string(bt[start:end])
 }
 
-// Html2str() returns escaping text convert from html
+// Html2str returns escaping text convert from html.
 func Html2str(html string) string {
 	src := string(html)
 
@@ -68,7 +60,8 @@ func DateFormat(t time.Time, layout string) (datestring string) {
 	return
 }
 
-var DatePatterns = []string{
+// DateFormat pattern rules.
+var datePatterns = []string{
 	// year
 	"Y", "2006", // A full numeric representation of a year, 4 digits   Examples: 1999 or 2003
 	"y", "06", //A two digit representation of a year   Examples: 99 or 03
@@ -108,22 +101,22 @@ var DatePatterns = []string{
 	"r", time.RFC1123Z,
 }
 
-// Parse Date use PHP time format
+// Parse Date use PHP time format.
 func DateParse(dateString, format string) (time.Time, error) {
-	replacer := strings.NewReplacer(DatePatterns...)
+	replacer := strings.NewReplacer(datePatterns...)
 	format = replacer.Replace(format)
 	return time.ParseInLocation(format, dateString, time.Local)
 }
 
-// Date takes a PHP like date func to Go's time format
+// Date takes a PHP like date func to Go's time format.
 func Date(t time.Time, format string) string {
-	replacer := strings.NewReplacer(DatePatterns...)
+	replacer := strings.NewReplacer(datePatterns...)
 	format = replacer.Replace(format)
 	return t.Format(format)
 }
 
 // Compare is a quick and dirty comparison function. It will convert whatever you give it to strings and see if the two values are equal.
-// Whitespace is trimmed. Used by the template parser as "eq"
+// Whitespace is trimmed. Used by the template parser as "eq".
 func Compare(a, b interface{}) (equal bool) {
 	equal = false
 	if strings.TrimSpace(fmt.Sprintf("%v", a)) == strings.TrimSpace(fmt.Sprintf("%v", b)) {
@@ -132,10 +125,12 @@ func Compare(a, b interface{}) (equal bool) {
 	return
 }
 
+// Convert string to template.HTML type.
 func Str2html(raw string) template.HTML {
 	return template.HTML(raw)
 }
 
+// Htmlquote returns quoted html string.
 func Htmlquote(src string) string {
 	//HTML编码为实体符号
 	/*
@@ -158,6 +153,7 @@ func Htmlquote(src string) string {
 	return strings.TrimSpace(text)
 }
 
+// Htmlunquote returns unquoted html string.
 func Htmlunquote(src string) string {
 	//实体符号解释为HTML
 	/*
@@ -182,16 +178,41 @@ func Htmlunquote(src string) string {
 	return strings.TrimSpace(text)
 }
 
-func inSlice(v string, sl []string) bool {
-	for _, vv := range sl {
-		if vv == v {
-			return true
-		}
-	}
-	return false
+// UrlFor returns url string with another registered controller handler with params.
+//	usage:
+//	UrlFor(".index")
+//	print UrlFor("index")
+//	print UrlFor("login")
+//	print UrlFor("login", "next","/"")
+//	print UrlFor("profile", "username","John Doe")
+//	result:
+//	/
+//	/login
+//	/login?next=/
+//	/user/John%20Doe
+func UrlFor(endpoint string, values ...string) string {
+	return BeeApp.UrlFor(endpoint, values...)
 }
 
-// parse form values to struct via tag
+// returns script tag with src string.
+func AssetsJs(src string) template.HTML {
+	text := string(src)
+
+	text = "<script src=\"" + src + "\"></script>"
+
+	return template.HTML(text)
+}
+
+// returns stylesheet link tag with src string.
+func AssetsCss(src string) template.HTML {
+	text := string(src)
+
+	text = "<link href=\"" + src + "\" rel=\"stylesheet\" />"
+
+	return template.HTML(text)
+}
+
+// parse form values to struct via tag.
 func ParseForm(form url.Values, obj interface{}) error {
 	objT := reflect.TypeOf(obj)
 	objV := reflect.ValueOf(obj)
@@ -279,7 +300,8 @@ var unKind = map[reflect.Kind]bool{
 	reflect.UnsafePointer: true,
 }
 
-// obj must be a struct pointer
+// render object to form html.
+// obj must be a struct pointer.
 func RenderForm(obj interface{}) template.HTML {
 	objT := reflect.TypeOf(obj)
 	objV := reflect.ValueOf(obj)
@@ -339,52 +361,155 @@ func isStructPtr(t reflect.Type) bool {
 	return t.Kind() == reflect.Ptr && t.Elem().Kind() == reflect.Struct
 }
 
-func stringsToJson(str string) string {
-	rs := []rune(str)
-	jsons := ""
-	for _, r := range rs {
-		rint := int(r)
-		if rint < 128 {
-			jsons += string(r)
-		} else {
-			jsons += "\\u" + strconv.FormatInt(int64(rint), 16) // json
+// go1.2 added template funcs. begin
+var (
+	errBadComparisonType = errors.New("invalid type for comparison")
+	errBadComparison     = errors.New("incompatible types for comparison")
+	errNoComparison      = errors.New("missing argument for comparison")
+)
+
+type kind int
+
+const (
+	invalidKind kind = iota
+	boolKind
+	complexKind
+	intKind
+	floatKind
+	integerKind
+	stringKind
+	uintKind
+)
+
+func basicKind(v reflect.Value) (kind, error) {
+	switch v.Kind() {
+	case reflect.Bool:
+		return boolKind, nil
+	case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64:
+		return intKind, nil
+	case reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64, reflect.Uintptr:
+		return uintKind, nil
+	case reflect.Float32, reflect.Float64:
+		return floatKind, nil
+	case reflect.Complex64, reflect.Complex128:
+		return complexKind, nil
+	case reflect.String:
+		return stringKind, nil
+	}
+	return invalidKind, errBadComparisonType
+}
+
+// eq evaluates the comparison a == b || a == c || ...
+func eq(arg1 interface{}, arg2 ...interface{}) (bool, error) {
+	v1 := reflect.ValueOf(arg1)
+	k1, err := basicKind(v1)
+	if err != nil {
+		return false, err
+	}
+	if len(arg2) == 0 {
+		return false, errNoComparison
+	}
+	for _, arg := range arg2 {
+		v2 := reflect.ValueOf(arg)
+		k2, err := basicKind(v2)
+		if err != nil {
+			return false, err
+		}
+		if k1 != k2 {
+			return false, errBadComparison
+		}
+		truth := false
+		switch k1 {
+		case boolKind:
+			truth = v1.Bool() == v2.Bool()
+		case complexKind:
+			truth = v1.Complex() == v2.Complex()
+		case floatKind:
+			truth = v1.Float() == v2.Float()
+		case intKind:
+			truth = v1.Int() == v2.Int()
+		case stringKind:
+			truth = v1.String() == v2.String()
+		case uintKind:
+			truth = v1.Uint() == v2.Uint()
+		default:
+			panic("invalid kind")
+		}
+		if truth {
+			return true, nil
 		}
 	}
-	return jsons
+	return false, nil
 }
 
-func FileExists(path string) (bool, error) {
-	_, err := os.Stat(path)
-	if err == nil {
-		return true, nil
-	}
-	if os.IsNotExist(err) {
-		return false, nil
-	}
-	return false, err
+// ne evaluates the comparison a != b.
+func ne(arg1, arg2 interface{}) (bool, error) {
+	// != is the inverse of ==.
+	equal, err := eq(arg1, arg2)
+	return !equal, err
 }
 
-func GetRandomString(n int) string {
-	const alphanum = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz"
-	var bytes = make([]byte, n)
-	rand.Read(bytes)
-	for i, b := range bytes {
-		bytes[i] = alphanum[b%byte(len(alphanum))]
+// lt evaluates the comparison a < b.
+func lt(arg1, arg2 interface{}) (bool, error) {
+	v1 := reflect.ValueOf(arg1)
+	k1, err := basicKind(v1)
+	if err != nil {
+		return false, err
 	}
-	return string(bytes)
+	v2 := reflect.ValueOf(arg2)
+	k2, err := basicKind(v2)
+	if err != nil {
+		return false, err
+	}
+	if k1 != k2 {
+		return false, errBadComparison
+	}
+	truth := false
+	switch k1 {
+	case boolKind, complexKind:
+		return false, errBadComparisonType
+	case floatKind:
+		truth = v1.Float() < v2.Float()
+	case intKind:
+		truth = v1.Int() < v2.Int()
+	case stringKind:
+		truth = v1.String() < v2.String()
+	case uintKind:
+		truth = v1.Uint() < v2.Uint()
+	default:
+		panic("invalid kind")
+	}
+	return truth, nil
 }
 
-// This will reference the index function local to the current blueprint:
-//	UrlFor(".index")
-//	...  print UrlFor("index")
-//	...  print UrlFor("login")
-//	...  print UrlFor("login", "next","/"")
-//	...  print UrlFor("profile", "username","John Doe")
-//	...
-//	/
-//	/login
-//	/login?next=/
-//	/user/John%20Doe
-func UrlFor(endpoint string, values ...string) string {
-	return BeeApp.UrlFor(endpoint, values...)
+// le evaluates the comparison <= b.
+func le(arg1, arg2 interface{}) (bool, error) {
+	// <= is < or ==.
+	lessThan, err := lt(arg1, arg2)
+	if lessThan || err != nil {
+		return lessThan, err
+	}
+	return eq(arg1, arg2)
 }
+
+// gt evaluates the comparison a > b.
+func gt(arg1, arg2 interface{}) (bool, error) {
+	// > is the inverse of <=.
+	lessOrEqual, err := le(arg1, arg2)
+	if err != nil {
+		return false, err
+	}
+	return !lessOrEqual, nil
+}
+
+// ge evaluates the comparison a >= b.
+func ge(arg1, arg2 interface{}) (bool, error) {
+	// >= is the inverse of <.
+	lessThan, err := lt(arg1, arg2)
+	if err != nil {
+		return false, err
+	}
+	return !lessThan, nil
+}
+
+// go1.2 added template funcs. end

@@ -9,9 +9,10 @@ package session
 
 import (
 	"database/sql"
-	_ "github.com/beego/mysql"
 	"sync"
 	"time"
+
+	_ "github.com/go-sql-driver/mysql"
 )
 
 var mysqlpder = &MysqlProvider{}
